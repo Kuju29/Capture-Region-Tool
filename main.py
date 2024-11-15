@@ -52,6 +52,7 @@ class ScreenCaptureApp:
         self.save_button.pack(pady=10)
 
         self.screenshot = None
+        self.full_screenshot = None
         self.coordinates = {}
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
@@ -64,10 +65,8 @@ class ScreenCaptureApp:
     def capture_region(self):
         self.root.withdraw()
 
-        self.start_x = None
-        self.start_y = None
-        self.end_x = None
-        self.end_y = None
+        self.full_screenshot = ImageGrab.grab()
+
         x1, y1, x2, y2 = self.get_mouse_selection()
 
         self.root.deiconify()
@@ -77,8 +76,11 @@ class ScreenCaptureApp:
 
         left = min(x1, x2)
         top = min(y1, y2)
-        width = abs(x2 - x1)
-        height = abs(y2 - y1)
+        right = max(x1, x2)
+        bottom = max(y1, y2)
+
+        width = right - left
+        height = bottom - top
 
         if width == 0 or height == 0:
             messagebox.showwarning("Warning", "No region selected.")
@@ -99,8 +101,8 @@ class ScreenCaptureApp:
         self._on_text_change(None)
         self.region_info.config(state='disabled')
 
-        self.screenshot = ImageGrab.grab(
-            bbox=(left, top, left + width, top + height))
+
+        self.screenshot = self.full_screenshot.crop((left, top, right, bottom))
 
         self.photo = ImageTk.PhotoImage(self.screenshot)
         self.image_canvas.delete("all")
@@ -140,8 +142,8 @@ class ScreenCaptureApp:
         y_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def get_mouse_selection(self):
-        screenshot = ImageGrab.grab()
-        self.bg_image = ImageTk.PhotoImage(screenshot)
+
+        self.bg_image = ImageTk.PhotoImage(self.full_screenshot)
 
         self.selection_window = tk.Toplevel(self.root)
         self.selection_window.attributes("-fullscreen", True)
@@ -153,8 +155,9 @@ class ScreenCaptureApp:
         self.end_x = None
         self.end_y = None
         self.rect = None
+        self.crosshair_lines = []
 
-        self.canvas = tk.Canvas(self.selection_window, cursor="cross", width=screenshot.width, height=screenshot.height)
+        self.canvas = tk.Canvas(self.selection_window, cursor="cross", width=self.full_screenshot.width, height=self.full_screenshot.height)
         self.canvas.pack(fill=tk.BOTH, expand=1)
 
 
@@ -164,11 +167,27 @@ class ScreenCaptureApp:
         self.canvas.bind("<B1-Motion>", self.on_move_press)
         self.canvas.bind("<ButtonRelease-1>", self.on_button_release)
 
+        self.canvas.bind("<Motion>", self.on_mouse_move)
+
         self.selection_window.bind("<Escape>", self.cancel_selection)
 
         self.root.wait_window(self.selection_window)
 
         return self.start_x, self.start_y, self.end_x, self.end_y
+
+    def on_mouse_move(self, event):
+        for line in self.crosshair_lines:
+            self.canvas.delete(line)
+        self.crosshair_lines.clear()
+
+
+        x = event.x
+        y = event.y
+
+
+        line1 = self.canvas.create_line(0, y, self.full_screenshot.width, y, fill='red', dash=(4, 2))
+        line2 = self.canvas.create_line(x, 0, x, self.full_screenshot.height, fill='red', dash=(4, 2))
+        self.crosshair_lines.extend([line1, line2])
 
     def on_button_press(self, event):
         self.start_x = event.x
@@ -197,7 +216,6 @@ class ScreenCaptureApp:
 
     def save_image(self):
         if self.screenshot:
-
             image_file_path = filedialog.asksaveasfilename(defaultextension='.png', filetypes=[
                                                            ("PNG files", "*.png"), ("All files", "*.*")], title="Save Image As")
             if image_file_path:
