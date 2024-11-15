@@ -140,9 +140,12 @@ class ScreenCaptureApp:
         y_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def get_mouse_selection(self):
+        screenshot = ImageGrab.grab()
+        self.bg_image = ImageTk.PhotoImage(screenshot)
+
         self.selection_window = tk.Toplevel(self.root)
         self.selection_window.attributes("-fullscreen", True)
-        self.selection_window.attributes("-alpha", 0.3)
+        self.selection_window.attributes("-alpha", 1.0)
         self.selection_window.config(bg='black')
 
         self.start_x = None
@@ -151,8 +154,11 @@ class ScreenCaptureApp:
         self.end_y = None
         self.rect = None
 
-        self.canvas = tk.Canvas(self.selection_window, cursor="cross")
+        self.canvas = tk.Canvas(self.selection_window, cursor="cross", width=screenshot.width, height=screenshot.height)
         self.canvas.pack(fill=tk.BOTH, expand=1)
+
+
+        self.canvas.create_image(0, 0, image=self.bg_image, anchor='nw')
 
         self.canvas.bind("<ButtonPress-1>", self.on_button_press)
         self.canvas.bind("<B1-Motion>", self.on_move_press)
@@ -165,29 +171,20 @@ class ScreenCaptureApp:
         return self.start_x, self.start_y, self.end_x, self.end_y
 
     def on_button_press(self, event):
-        self.start_x = event.x_root
-        self.start_y = event.y_root
+        self.start_x = event.x
+        self.start_y = event.y
 
-        self.rect = self.canvas.create_rectangle(
-            0, 0, 0, 0, outline='red', width=2)
+        self.rect = self.canvas.create_rectangle(0, 0, 0, 0, outline='red', width=2)
 
     def on_move_press(self, event):
-        curX = event.x_root
-        curY = event.y_root
+        curX = event.x
+        curY = event.y
 
-        self.canvas.delete("all")
-
-        screen_width = self.selection_window.winfo_screenwidth()
-        screen_height = self.selection_window.winfo_screenheight()
-        self.canvas.create_rectangle(
-            0, 0, screen_width, screen_height, fill='black', stipple='gray50')
-
-        self.canvas.create_rectangle(self.start_x, self.start_y, curX,
-                                     curY, outline='red', width=2, fill='white', stipple='gray75')
+        self.canvas.coords(self.rect, self.start_x, self.start_y, curX, curY)
 
     def on_button_release(self, event):
-        self.end_x = event.x_root
-        self.end_y = event.y_root
+        self.end_x = event.x
+        self.end_y = event.y
 
         self.selection_window.destroy()
 
